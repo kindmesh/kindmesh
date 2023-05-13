@@ -14,16 +14,19 @@ KindMesh的目标是为Kubernetes提供低延迟、高可用、具有丰富流�
 
 ## Pre Requirements
 
-- 安装 Kubenetes，本地测试建议使用[Kind](https://kind.sigs.k8s.io/)来安装。
-
-## Example
-
-1. 安装crd
+- 1. 安装 Kubenetes，本地测试建议使用[Kind](https://kind.sigs.k8s.io/)来安装。
+- 2. 安装crd
 ```
 kubectl apply -f resource/crd/l7service.yaml
 ```
+- 3. 安装DaemonSet
+```
+kubectl apply -f resource/daemonset.yaml
+```
 
-2. 部署示例Deployment
+## Example
+
+1. 部署示例Deployment
 ```
 kubectl apply -f resource/example/bookinfo/ratings.yaml
 ```
@@ -44,6 +47,7 @@ spec:
     app: ratings
   containerPort: 8080
 ```
+即可以在集群内通过域名 raings或ratings.<namespace>，或ratings.<namespace>.svc.cluster.local来访问对应deployment中的容器。
 
 4. 在Ingress中使用
 

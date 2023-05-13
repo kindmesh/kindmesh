@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"context"
+	"log"
 	"os"
 	"os/signal"
 	"time"
@@ -15,7 +16,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func watchCRDs(client dynamic.Interface) {
+func watchCRDs() {
+	client, err := dynamic.NewForConfig(getRestConfig())
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	resource := schema.GroupVersionResource{Group: "webapp.tutorial.kubebuilder.io", Version: "v1", Resource: "guestbooks"}
 	factory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(client, time.Minute, corev1.NamespaceAll, nil)

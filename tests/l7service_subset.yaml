@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: L7Service
+metadata:
+  name: my-nginx
+spec:
+  selector:
+    app: nginx
+  protocol: http
+  targetPort: 9376
+  routers:
+  - match:
+      header:
+        a: b
+    router:
+      subset: v2
+  - match:
+      prefix: /
+    router:
+      subset: v1
+  

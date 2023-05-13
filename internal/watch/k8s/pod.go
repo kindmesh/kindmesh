@@ -10,17 +10,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func watchPods(clientSet *kubernetes.Clientset) {
-	// config, err := clientcmd.BuildConfigFromFlags("", filepath.Join(os.Getenv("HOME"), ".kube", "config"))
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// // 创建 client
-	// clientSet, err := kubernetes.NewForConfig(config)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+func watchPods() {
+	clientSet, err := kubernetes.NewForConfig(getRestConfig())
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	//create an api object
 	api := clientSet.CoreV1()
@@ -43,9 +37,11 @@ func watchPods(clientSet *kubernetes.Clientset) {
 		}
 
 		switch event.Type {
-
 		case watch.Added:
-			log.Printf(" Pod %s added \n", pod.Name)
+			log.Printf(" Pod %s-%s added %s %v \n", pod.Spec.NodeName, pod.Name, pod.Kind, pod.Labels)
+
+		case watch.Modified:
+			log.Printf(" Pod %s update \n", pod.Name)
 
 		case watch.Deleted:
 			log.Printf(" Pod %s deleted \n", pod.Name)

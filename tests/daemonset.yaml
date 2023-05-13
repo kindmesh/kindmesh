@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kindmesh
+  namespace: default
+  labels:
+    k8s-app: kindmesh
+spec:
+  selector:
+    matchLabels:
+      k8s-app: kindmesh
+  template:
+    metadata:
+      labels:
+        k8s-app: kindmesh
+    spec:
+      dnsPolicy: ClusterFirst
+      hostNetwork: true
+      nodeSelector:
+        kubernetes.io/os: linux
+      containers:
+      - name: centos
+        # image: kindmesh
+        image: centos:7
+        command: ["python"]
+        args: ["-m", "SimpleHTTPServer", "9000"]
+        securityContext:
+          capabilities:
+            add:
+            - NET_ADMIN
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName

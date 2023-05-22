@@ -36,5 +36,5 @@ func main() {
 		panic("coredns exit")
 	}()
 
-	server.Serve(":19001")
+	server.Serve("127.0.0.1:19001")
 }

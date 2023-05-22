@@ -3,7 +3,7 @@ package app
 import (
 	"github.com/kindmesh/kindmesh/internal/proxy/envoy"
 	"github.com/kindmesh/kindmesh/internal/watch/k8s"
-	// "k8s.io/dns/pkg/netif"
+	_ "k8s.io/dns/pkg/netif"
 )
 
 func Run() {

@@ -1,14 +1,12 @@
 run:
-	go run main.go
+	go run cmd/mesh-agent/main.go
 
 image:
-	docker build -t kindmesh -f build/Dockerfile.kindmesh .
+	docker build -t mesh-agent -f build/Dockerfile.mesh-agent .
+	docker build -t local-dns -f build/Dockerfile.local-dns .
+	docker build -t envoy -f build/Dockerfile.envoy .
 
-load: build
-	kind load docker-image kindmesh
-
-image-envoy:
-	docker build -t kindmesh-envoy -f build/Dockerfile.envoy .
-
-load-envoy: build-envoy
-	kind load docker-image kindmesh-envoy
+load: image
+	kind load docker-image mesh-agent
+	kind load docker-image local-dns
+	kind load docker-image envoy

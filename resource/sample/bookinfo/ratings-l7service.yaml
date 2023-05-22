@@ -1,0 +1,9 @@
+apiVersion: kindmesh.io/v1
+kind: L7Service
+metadata:
+  name: ratings
+spec:
+  selector:
+    app: ratings
+  protocol: http
+  targetPort: 8081

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/kindmesh/kindmesh/internal/watch/processor"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -12,6 +13,7 @@ import (
 func Watch() {
 	go watchCRDs()
 	go watchPods()
+	go processor.Init()
 }
 
 func getRestConfig() *rest.Config {

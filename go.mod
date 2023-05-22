@@ -15,7 +15,6 @@ require (
 	k8s.io/apimachinery v0.26.1
 	k8s.io/client-go v0.26.1
 	k8s.io/dns v0.0.0-20230331134350-76795c66ba55
-	k8s.io/utils v0.0.0-20230209194617-a36077c30491
 )
 
 require (
@@ -97,44 +96,44 @@ require (
 	inet.af/netaddr v0.0.0-20220617031823-097006376321 // indirect
 	k8s.io/klog/v2 v2.90.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
-	k8s.io/kubernetes v1.24.10 // indirect
+	k8s.io/utils v0.0.0-20230209194617-a36077c30491 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-replace (
-	// pinned latest version for vulnerability fixes
-	// this one is used by coredns
-	// if coredns starts using >= v0.14.0 this pinned version can be removed
-	github.com/apache/thrift => github.com/apache/thrift v0.14.0
+// replace (
+// 	// pinned latest version for vulnerability fixes
+// 	// this one is used by coredns
+// 	// if coredns starts using >= v0.14.0 this pinned version can be removed
+// 	github.com/apache/thrift => github.com/apache/thrift v0.14.0
 
-	// pinned latest version for vulnerability fixes, upgrade if there are newer versions
-	golang.org/x/crypto => golang.org/x/crypto v0.1.0
+// 	// pinned latest version for vulnerability fixes, upgrade if there are newer versions
+// 	golang.org/x/crypto => golang.org/x/crypto v0.1.0
 
-	k8s.io/api => k8s.io/api v0.24.7
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.24.7
-	k8s.io/apimachinery => k8s.io/apimachinery v0.24.7
-	k8s.io/apiserver => k8s.io/apiserver v0.24.7
-	k8s.io/cli-runtime => k8s.io/cli-runtime v0.24.7
-	k8s.io/client-go => k8s.io/client-go v0.24.7
-	k8s.io/cloud-provider => k8s.io/cloud-provider v0.24.7
-	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.24.7
-	k8s.io/code-generator => k8s.io/code-generator v0.24.7
-	k8s.io/component-base => k8s.io/component-base v0.24.7
-	k8s.io/component-helpers => k8s.io/component-helpers v0.24.7
-	k8s.io/controller-manager => k8s.io/controller-manager v0.24.7
-	k8s.io/cri-api => k8s.io/cri-api v0.24.7
-	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.24.7
-	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.24.7
-	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.24.7
-	k8s.io/kube-proxy => k8s.io/kube-proxy v0.24.7
-	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.24.7
-	k8s.io/kubectl => k8s.io/kubectl v0.24.7
-	k8s.io/kubelet => k8s.io/kubelet v0.24.7
-	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.24.7
-	k8s.io/metrics => k8s.io/metrics v0.24.7
-	k8s.io/mount-utils => k8s.io/mount-utils v0.24.7
-	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.24.7
-	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.24.7
-)
+// 	k8s.io/api => k8s.io/api v0.24.7
+// 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.24.7
+// 	k8s.io/apimachinery => k8s.io/apimachinery v0.24.7
+// 	k8s.io/apiserver => k8s.io/apiserver v0.24.7
+// 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.24.7
+// 	k8s.io/client-go => k8s.io/client-go v0.24.7
+// 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.24.7
+// 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.24.7
+// 	k8s.io/code-generator => k8s.io/code-generator v0.24.7
+// 	k8s.io/component-base => k8s.io/component-base v0.24.7
+// 	k8s.io/component-helpers => k8s.io/component-helpers v0.24.7
+// 	k8s.io/controller-manager => k8s.io/controller-manager v0.24.7
+// 	k8s.io/cri-api => k8s.io/cri-api v0.24.7
+// 	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.24.7
+// 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.24.7
+// 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.24.7
+// 	k8s.io/kube-proxy => k8s.io/kube-proxy v0.24.7
+// 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.24.7
+// 	k8s.io/kubectl => k8s.io/kubectl v0.24.7
+// 	k8s.io/kubelet => k8s.io/kubelet v0.24.7
+// 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.24.7
+// 	k8s.io/metrics => k8s.io/metrics v0.24.7
+// 	k8s.io/mount-utils => k8s.io/mount-utils v0.24.7
+// 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.24.7
+// 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.24.7
+// )

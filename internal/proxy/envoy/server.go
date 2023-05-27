@@ -21,6 +21,7 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/server/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/test/v3"
+	"github.com/kindmesh/kindmesh/internal/spec"
 )
 
 const (
@@ -53,7 +54,7 @@ func ServeAPI() {
 	ctx := context.Background()
 	cb := &test.Callbacks{Debug: l.Debug}
 	srv := server.NewServer(ctx, cache, cb)
-	runServer(ctx, srv, 18988)
+	runServer(ctx, srv)
 }
 
 func registerServer(grpcServer *grpc.Server, server server.Server) {
@@ -68,7 +69,7 @@ func registerServer(grpcServer *grpc.Server, server server.Server) {
 }
 
 // RunServer starts an xDS server at the given port.
-func runServer(ctx context.Context, srv server.Server, port uint) {
+func runServer(ctx context.Context, srv server.Server) {
 	// gRPC golang library sets a very small upper bound for the number gRPC/h2
 	// streams over a single TCP connection. If a proxy multiplexes requests over
 	// a single connection to the management server, then it might lead to
@@ -87,14 +88,14 @@ func runServer(ctx context.Context, srv server.Server, port uint) {
 	)
 	grpcServer := grpc.NewServer(grpcOptions...)
 
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	lis, err := net.Listen("tcp", fmt.Sprintf(spec.ENVOY_CONTROL_IP+":80"))
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	registerServer(grpcServer, srv)
 
-	log.Printf("management server listening on %d\n", port)
+	log.Printf("management server listening on %s\n", spec.ENVOY_CONTROL_IP)
 	if err = grpcServer.Serve(lis); err != nil {
 		log.Println(err)
 	}

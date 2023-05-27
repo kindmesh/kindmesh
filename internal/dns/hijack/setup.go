@@ -15,7 +15,6 @@ func setup(c *caddy.Controller) error {
 	if c.NextArg() {
 		return plugin.Error(name, c.ArgErr())
 	}
-
 	dnsserver.GetConfig(c).AddPlugin(func(next plugin.Handler) plugin.Handler {
 		hijacking := Hijacking{
 			Next: next,

@@ -3,9 +3,10 @@ package processor
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
-	"time"
 
+	"github.com/kindmesh/kindmesh/internal/spec"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/watch"
 )
@@ -15,13 +16,15 @@ type processor struct {
 	hostIP    string
 	dnsInfo   *dnsInfo
 
-	ns2GwIP map[string]string
+	gwMalloctor malloctor
+	emitor      emitor
+
+	dnsRequest   *spec.DNSRequest
+	routerRequst *spec.RouterRequst
 
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
-
-	buildInterval time.Duration
 }
 
 type metaEvent struct {
@@ -35,7 +38,7 @@ type dnsInfo struct {
 	clusterDomain string
 }
 
-func newProcessor(hostIP, clusterDomain string) *processor {
+func newProcessor(hostIP, clusterDomain string, gwMalloctor malloctor, emitor emitor) *processor {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &processor{
 		eventChan: make(chan *metaEvent, 10000),
@@ -45,11 +48,11 @@ func newProcessor(hostIP, clusterDomain string) *processor {
 			serviceList:   map[string]bool{},
 			clusterDomain: clusterDomain,
 		},
-		ns2GwIP:       map[string]string{},
-		ctx:           ctx,
-		cancel:        cancel,
-		wg:            sync.WaitGroup{},
-		buildInterval: time.Millisecond * 100,
+		gwMalloctor: gwMalloctor,
+		emitor:      emitor,
+		ctx:         ctx,
+		cancel:      cancel,
+		wg:          sync.WaitGroup{},
 	}
 }
 
@@ -75,7 +78,7 @@ func (p *processor) processEvent() {
 				return
 			}
 		}
-		if svc, ok := e.object.(*L7Service); ok {
+		if svc, ok := e.object.(*spec.L7Service); ok {
 			domain := svc.MetaData.Name + "." + svc.MetaData.Namespace + "."
 			switch e.eventType {
 			case watch.Added:
@@ -104,13 +107,6 @@ func (p *processor) processEvent() {
 	}
 }
 
-type DnsRequst struct {
-	Pod2NS        map[string]string
-	Pod2GwIP      map[string]string
-	ServiceList   []string
-	ClusterDomain string
-}
-
 func (p *processor) processMetaEvent() {
 	p.wg.Add(1)
 	defer p.wg.Done()
@@ -125,59 +121,56 @@ func (p *processor) processMetaEvent() {
 	}
 }
 func (p *processor) buildMeta() {
-	p.buildDNS()
-	p.buildEnvoy()
+	if err := p.buildDNS(); err != nil {
+		log.Printf("build dns error %v\n", err)
+		return
+	}
+	if err := p.buildEnvoy(); err != nil {
+		log.Printf("build envoy api error %v\n", err)
+		return
+	}
+	p.emitor(p.dnsRequest, p.routerRequst)
 }
 
-func (p *processor) buildDNS() {
+func (p *processor) buildDNS() error {
 	var serviceList []string
 	for k := range p.dnsInfo.serviceList {
 		serviceList = append(serviceList, k)
 	}
 
-	pod2gw := p.rebuildPod2GwIP(p.dnsInfo.pod2ns)
+	pod2gw, err := p.rebuildPod2GwIP(p.dnsInfo.pod2ns)
+	if err != nil {
+		return err
+	}
 
-	dnsReq := DnsRequst{
+	p.dnsRequest = &spec.DNSRequest{
 		Pod2NS:        p.dnsInfo.pod2ns,
 		Pod2GwIP:      pod2gw,
 		ServiceList:   serviceList,
 		ClusterDomain: p.dnsInfo.clusterDomain,
 	}
-
-	fmt.Println("dns Req is", dnsReq)
+	return nil
 }
 
-func (p *processor) buildEnvoy() {
+func (p *processor) buildEnvoy() error {
+	p.routerRequst = &spec.RouterRequst{}
+	return nil
 }
 
-func (p *processor) rebuildPod2GwIP(pod2ns map[string]string) map[string]string {
+func (p *processor) rebuildPod2GwIP(pod2ns map[string]string) (map[string]string, error) {
+	names := make(map[string]bool)
+	for _, ns := range pod2ns {
+		names[ns] = true
+	}
+	ns2GwIP, err := p.gwMalloctor.AllocateForNames(names)
+	if err != nil {
+		return nil, fmt.Errorf("allocate gw ip error %v", err)
+	}
 	ret := map[string]string{}
-	needDelete := map[string]bool{}
-	for ns := range p.ns2GwIP {
-		needDelete[ns] = true
-	}
 	for ip, ns := range pod2ns {
-		delete(needDelete, ns)
-		if v, ok := p.ns2GwIP[ns]; ok {
-			ret[ip] = v
-		} else {
-			p.allocGwIp(ns)
-			ret[ip] = p.ns2GwIP[ns]
-		}
+		ret[ip] = ns2GwIP[ns]
 	}
-	for ns := range needDelete {
-		delete(p.ns2GwIP, ns)
-	}
-	return ret
-}
-
-func (p *processor) allocGwIp(ns string) {
-	// ip := net.ParseIP("169.254.10.1")
-	// mgr := netif.NewNetifManager([]net.IP{ip})
-	// if err := mgr.AddDummyDevice("kindmesh"); err != nil {
-	// panic(err)
-	// }
-	p.ns2GwIP[ns] = "gwip"
+	return ret, nil
 }
 
 func (p *processor) stop() {

@@ -2,7 +2,7 @@
     hijack
     cache 30
     reload
-    bind 127.0.0.1
+    bind {$DNS_BIND_IP}
     forward . /etc/resolv.conf
     prometheus :9253
 }

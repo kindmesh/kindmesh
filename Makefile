@@ -1,6 +1,7 @@
 run:
 	go run cmd/mesh-agent/main.go
-
+dns:
+	go run cmd/local-dns/main.go --conf config/Corefile
 image:
 	docker build -t mesh-agent -f build/Dockerfile.mesh-agent .
 	docker build -t local-dns -f build/Dockerfile.local-dns .

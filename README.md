@@ -17,7 +17,7 @@ KindMesh的目标是为Kubernetes提供低延迟、高可用、具有丰富流�
 - 安装 Kubernetes，本地测试可使用[Kind](https://kind.sigs.k8s.io/)来安装。
 - 安装 CRD
 ```
-kubectl apply -f resource/crd/l7service.yaml
+kubectl apply -f resource/l7service_crd.yaml
 ```
 - 部署DaemonSet
 ```

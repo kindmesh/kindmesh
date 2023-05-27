@@ -5,12 +5,22 @@ import (
 	"log"
 	"os"
 
+	"github.com/kindmesh/kindmesh/internal/spec"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/watch"
 )
 
 var GlobalCache *MetaCache
+var Emitor emitor = func(dns *spec.DNSRequest, router *spec.RouterRequst) {
+	log.Println("emit", *dns, *router)
+}
+
+type malloctor interface {
+	AllocateForNames(names map[string]bool) (map[string]string, error)
+}
+
+type emitor func(dns *spec.DNSRequest, router *spec.RouterRequst)
 
 func Init() {
 	hostIP := os.Getenv("HOST_IP")
@@ -21,7 +31,7 @@ func Init() {
 	if clusetrDomain == "" {
 		clusetrDomain = "svc.cluster.local"
 	}
-	GlobalCache = &MetaCache{p: newProcessor(hostIP, clusetrDomain)}
+	GlobalCache = &MetaCache{p: newProcessor(hostIP, clusetrDomain, newDefaultMalloctor(), Emitor)}
 	go GlobalCache.p.processMetaEvent()
 }
 
@@ -40,7 +50,7 @@ func (m *MetaCache) NewCRDEvent(eventType watch.EventType, obj interface{}) {
 		log.Println("MarshalJSON error:", err, obj)
 		return
 	}
-	svc := &L7Service{}
+	svc := &spec.L7Service{}
 	if err := json.Unmarshal(bs, svc); err != nil {
 		log.Println("MarshalJSON error:", err, obj)
 		return

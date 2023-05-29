@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kindmesh
+  namespace: default
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kindmesh-role
+rules:
+- apiGroups: [""]
+  # 在 HTTP 层面，用来访问 Secret 资源的名称为 "secrets"
+  resources: ["pods"]
+  verbs: ["get", "watch", "list"]
+- apiGroups: ["kindmesh.io"]
+  # 在 HTTP 层面，用来访问 Secret 资源的名称为 "secrets"
+  resources: ["l7services"]
+  verbs: ["get", "watch", "list"]
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+# 此集群角色绑定允许 “manager” 组中的任何人访问任何名字空间中的 Secret 资源
+kind: ClusterRoleBinding
+metadata:
+  name: kindmesh-role-binding
+subjects:
+- kind: ServiceAccount
+  name: kindmesh
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: kindmesh-role
+  apiGroup: rbac.authorization.k8s.io
+---
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kindmesh
+  namespace: default
+  labels:
+    k8s-app: kindmesh
+spec:
+  selector:
+    matchLabels:
+      k8s-app: kindmesh
+  template:
+    metadata:
+      labels:
+        k8s-app: kindmesh
+    spec:
+      dnsPolicy: ClusterFirst
+      hostNetwork: true
+      serviceAccountName: kindmesh
+      nodeSelector:
+        kubernetes.io/os: linux
+      containers:
+      - name: envoy
+        image: kindmesh/envoy
+        imagePullPolicy: Never
+      - name: local-dns
+        image: kindmesh/local-dns
+        imagePullPolicy: Never
+      - name: mesh-agent
+        image: kindmesh/mesh-agent
+        imagePullPolicy: Never
+        securityContext:
+          capabilities:
+            add:
+            - NET_ADMIN
+        env:
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: HOST_IP2
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP

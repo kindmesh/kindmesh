@@ -1,0 +1,14 @@
+FROM golang:1.20.2 AS builder
+WORKDIR /app/
+COPY go.mod go.sum /app/
+RUN go mod download
+ADD . /app/
+RUN go build -o local-dns ./cmd/local-dns
+
+FROM centos:7 
+WORKDIR /root/
+RUN mkdir -p /root/config
+COPY --from=builder /app/local-dns /root/local-dns
+COPY --from=builder /app/config /root/config
+ADD config/Corefile config/Corefile
+CMD ["/root/local-dns", "--conf", "config/Corefile"]

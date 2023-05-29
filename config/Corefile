@@ -1,0 +1,8 @@
+.:53 {
+    hijack
+    cache 30
+    reload
+    bind {$DNS_BIND_IP}
+    forward . /etc/resolv.conf
+    prometheus :9253
+}

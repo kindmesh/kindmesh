@@ -8,6 +8,7 @@ RUN go build -o mesh-agent ./cmd/mesh-agent
 FROM centos:7 
 WORKDIR /root/
 RUN mkdir -p /root/config
+RUN yum install -y iproute
 COPY --from=builder /app/mesh-agent /root/mesh-agent
 COPY --from=builder /app/config /root/config
 CMD ["/root/mesh-agent"]

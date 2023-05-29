@@ -16,7 +16,8 @@ import (
 
 func Run() {
 	// watch crd/pods
-	netdevice.EnsureDevice("bridge0")
+	netdevice.EnsureDevice("kindmesh")
+	// netdevice.EnsureDevice("bridge0")
 	netdevice.AddAddr(spec.DNS_BIND_IP)
 	netdevice.AddAddr(spec.ENVOY_CONTROL_IP)
 
@@ -25,12 +26,20 @@ func Run() {
 		body := bytes.NewBuffer(buf)
 		resp, err := http.Post("http://"+spec.DNS_BIND_IP, "application/json", body)
 		if err != nil {
+			// TODO: retry
 			log.Println("set dns error", err)
+			return
 		} else {
-			log.Println("set dns succ", *dns)
+			log.Println("set dns succ", string(buf))
 			resp.Body.Close()
 		}
-		// log.Printf("ds %v %v\n", *dns, *router)
+
+		if err := envoy.GenerateSnapshot(router); err != nil {
+			log.Println("set envoy router error", err)
+			return
+		} else {
+			log.Println("set envoy router succ")
+		}
 	}
 
 	k8s.Watch()

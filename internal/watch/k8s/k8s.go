@@ -19,8 +19,12 @@ func Watch() {
 func getRestConfig() *rest.Config {
 	configPath := filepath.Join(os.Getenv("HOME"), ".kube", "config")
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		// TODO: use in cluster mode
-		log.Fatal(err)
+		// creates the in-cluster config
+		config, err := rest.InClusterConfig()
+		if err != nil {
+			panic(err.Error())
+		}
+		return config
 	}
 	//Load kubernetes config
 	cfg, err := clientcmd.BuildConfigFromFlags("", configPath)

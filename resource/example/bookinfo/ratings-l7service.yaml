@@ -1,9 +1,9 @@
 apiVersion: kindmesh.io/v1
 kind: L7Service
 metadata:
-  name: ratings
+  name: nginx
 spec:
   selector:
-    app: ratings
+    app: nginx
   protocol: http
-  targetPort: 8081
+  targetPort: 80

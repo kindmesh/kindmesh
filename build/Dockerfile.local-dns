@@ -10,4 +10,5 @@ WORKDIR /root/
 RUN mkdir -p /root/config
 COPY --from=builder /app/local-dns /root/local-dns
 COPY --from=builder /app/config /root/config
-CMD ["/root/local-dns"]
+ADD config/Corefile config/Corefile
+CMD ["/root/local-dns", "--conf", "config/Corefile"]

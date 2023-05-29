@@ -13,7 +13,7 @@ import (
 
 func Serve(addr string) {
 	/*
-		curl -d '{"Pod2NS": {"127.0.0.1": "default"}, "Pod2GwIP": {"127.0.0.1": "169.254.10.1"}, "ClusterDomain": "svc.cluster.local.", "ServiceList": ["abc.default."]}' 127.0.0.1:19001/set-dns-hijack
+		curl -d '{"Pod2NS": {"169.254.99.1": "default"}, "NS2GwIP": {"default": "169.254.100.100"}, "ClusterDomain": "svc.cluster.local.", "ServiceList": ["abc.default."]}' 169.254.99.1/set-dns-hijack
 	*/
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		var p spec.DNSRequest
@@ -22,7 +22,7 @@ func Serve(addr string) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		state.SetHijackIp(p.Pod2NS, p.Pod2GwIP, p.ServiceList, p.ClusterDomain)
+		state.SetHijackIp(p.Pod2NS, p.NS2GwIP, p.ServiceList, p.ClusterDomain)
 		fmt.Fprintf(w, "update success")
 	})
 

@@ -27,6 +27,7 @@ func (m *mocker) AllocateForNames(names map[string]bool) (map[string]string, err
 func (m *mocker) Emit(dns *spec.DNSRequest, router *spec.RouterRequst) {
 	m.dns = dns
 	m.router = router
+	// fmt.Printf("dns %v %+v\n", *dns, *router)
 }
 
 func TestProcessor(t *testing.T) {
@@ -72,7 +73,7 @@ func TestProcessor(t *testing.T) {
 
 	assert.Equal(t, "default", mock.dns.Pod2NS["127.0.0.1"])
 	assert.Equal(t, "default2", mock.dns.Pod2NS["127.0.0.2"])
-	assert.Equal(t, "127.0.0.1", mock.dns.Pod2GwIP["127.0.0.2"])
+	assert.Equal(t, "127.0.0.1", mock.dns.NS2GwIP["default2"])
 
 	assert.Equal(t, "ratings.default.", mock.dns.ServiceList[0])
 	assert.Equal(t, "svc.cluster.local", mock.dns.ClusterDomain)

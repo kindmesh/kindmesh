@@ -23,6 +23,25 @@ kubectl apply -f resource/l7service_crd.yaml
 ```
 kubectl apply -f resource/daemonset.yaml
 ```
+- 配置DNS
+在POD配置DNS为169.254.99.1，如
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  namespace: default
+  name: dns-example
+spec:
+  containers:
+    - name: test
+      image: nginx
+  dnsPolicy: "None"
+  dnsConfig:
+    nameservers:
+      - 169.254.99.1 # 固定的本地地址
+```
+
+或修改kubelet 的 --cluster-dns 参数为169.254.99.1，即可不用在POD中配置。
 
 ## Example
 

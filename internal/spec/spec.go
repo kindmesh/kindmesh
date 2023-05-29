@@ -19,10 +19,41 @@ type L7Service struct {
 
 type DNSRequest struct {
 	Pod2NS        map[string]string
-	Pod2GwIP      map[string]string
+	NS2GwIP       map[string]string
 	ServiceList   []string
 	ClusterDomain string
 }
 
+type LDSInfo struct {
+	Name string
+	IP   string
+	Port uint32
+}
+
+type RDSInfo struct {
+	Name         string
+	VirtualHosts []VirtualHostInfo
+}
+
+type VirtualHostInfo struct {
+	Name    string
+	Domains []string
+	Routers [][]byte // protojson
+	Cluster string
+}
+
+type CDSInfo struct {
+	Name      string
+	Endpoints []EndpointInfo
+}
+
+type EndpointInfo struct {
+	IP   string
+	Port uint32
+}
+
 type RouterRequst struct {
+	LDS []LDSInfo
+	RDS []RDSInfo
+	CDS []CDSInfo
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
 	"time"
 
 	"google.golang.org/grpc"
@@ -31,29 +30,16 @@ const (
 	grpcMaxConcurrentStreams = 1000000
 )
 
+var snapCache = cache.NewSnapshotCache(false, cache.IDHash{}, nil)
+
 func ServeAPI() {
 	l := Logger{}
 	// Create a cache
-	cache := cache.NewSnapshotCache(false, cache.IDHash{}, nil)
-
-	// Create the snapshot that we'll serve to Envoy
-	snapshot := GenerateSnapshot()
-	if err := snapshot.Consistent(); err != nil {
-		l.Errorf("snapshot inconsistency: %+v\n%+v", snapshot, err)
-		os.Exit(1)
-	}
-	l.Debugf("will serve snapshot %+v", snapshot)
-
-	// Add the snapshot to the cache
-	if err := cache.SetSnapshot(context.Background(), "nodeID", snapshot); err != nil {
-		l.Errorf("snapshot error %q for %+v", err, snapshot)
-		os.Exit(1)
-	}
 
 	// Run the xDS server
 	ctx := context.Background()
 	cb := &test.Callbacks{Debug: l.Debug}
-	srv := server.NewServer(ctx, cache, cb)
+	srv := server.NewServer(ctx, snapCache, cb)
 	runServer(ctx, srv)
 }
 

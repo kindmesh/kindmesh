@@ -10,36 +10,40 @@ var state = atomic.Value{}
 
 type hijackState struct {
 	pod2NS        map[string]string
-	pod2GwIP      map[string]net.IP
+	ns2GwIP       map[string]net.IP
 	allDomains    map[string]bool
 	clusterDomain string
 }
 
 func init() {
-	state.Store(&hijackState{pod2NS: map[string]string{}, allDomains: map[string]bool{}, pod2GwIP: map[string]net.IP{}})
+	state.Store(&hijackState{pod2NS: map[string]string{}, allDomains: map[string]bool{}, ns2GwIP: map[string]net.IP{}})
 }
 
 // GetHijackIP returns dns ip by domain and clientIP
 func GetHijackIP(domain, clientIP string) net.IP {
 	m := state.Load().(*hijackState)
-	if m.allDomains[domain] {
-		return m.pod2GwIP[clientIP]
-	}
-	if m.allDomains[domain+m.clusterDomain] {
-		return m.pod2GwIP[clientIP]
-	}
 	ns, ok := m.pod2NS[clientIP]
 	if !ok {
 		return nil
 	}
+	ip := m.ns2GwIP[ns]
+	if ip == nil {
+		return nil
+	}
+	if m.allDomains[domain] {
+		return ip
+	}
+	if m.allDomains[domain+m.clusterDomain] {
+		return ip
+	}
 	if m.allDomains[domain+ns+"."+m.clusterDomain] {
-		return m.pod2GwIP[clientIP]
+		return ip
 	}
 	return nil
 }
 
 // SetHijackIp set hjiack config
-func SetHijackIp(pod2NS, pod2GwIP map[string]string, serviceList []string, clusterDomain string) {
+func SetHijackIp(pod2NS, ns2GwIP map[string]string, serviceList []string, clusterDomain string) {
 	clusterDomain = strings.TrimPrefix(clusterDomain, ".")
 	if !strings.HasSuffix(clusterDomain, ".") {
 		clusterDomain = clusterDomain + "."
@@ -52,9 +56,9 @@ func SetHijackIp(pod2NS, pod2GwIP map[string]string, serviceList []string, clust
 		}
 		allDomains[v+clusterDomain] = true
 	}
-	newPod2GwIP := map[string]net.IP{}
-	for k, v := range pod2GwIP {
-		newPod2GwIP[k] = net.ParseIP(v)
+	newNS2GwIP := map[string]net.IP{}
+	for k, v := range ns2GwIP {
+		newNS2GwIP[k] = net.ParseIP(v)
 	}
-	state.Store(&hijackState{pod2NS: pod2NS, allDomains: allDomains, pod2GwIP: newPod2GwIP, clusterDomain: clusterDomain})
+	state.Store(&hijackState{pod2NS: pod2NS, allDomains: allDomains, ns2GwIP: newNS2GwIP, clusterDomain: clusterDomain})
 }

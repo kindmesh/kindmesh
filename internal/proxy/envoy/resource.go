@@ -1,6 +1,9 @@
 package envoy
 
 import (
+	"context"
+	"encoding/json"
+	"log"
 	"strconv"
 	"time"
 
@@ -18,63 +21,65 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
+	"github.com/kindmesh/kindmesh/internal/spec"
 )
 
 const (
-	ClusterName  = "example_proxy_cluster"
-	RouteName    = "local_route"
-	ListenerName = "listener_0"
-	UpstreamHost = "www.envoyproxy.io"
-	UpstreamPort = 80
-
-	listenerAddr   = "0.0.0.0"
-	listenerPort   = 80
-	xdsClusterName = "xds_cluster"
+	xdsClusterName = "kind_xds_cluster"
 )
 
-func makeCluster(clusterName string) *cluster.Cluster {
+func makeCluster(cds spec.CDSInfo) *cluster.Cluster {
 	return &cluster.Cluster{
-		Name:                 clusterName,
-		ConnectTimeout:       durationpb.New(5 * time.Second),
-		ClusterDiscoveryType: &cluster.Cluster_Type{Type: cluster.Cluster_LOGICAL_DNS},
-		LbPolicy:             cluster.Cluster_ROUND_ROBIN,
-		LoadAssignment:       makeEndpoint(clusterName),
-		DnsLookupFamily:      cluster.Cluster_V4_ONLY,
+		Name:           cds.Name,
+		ConnectTimeout: durationpb.New(5 * time.Second),
+		LbPolicy:       cluster.Cluster_ROUND_ROBIN, // TODO configable
+		LoadAssignment: makeEndpoint(cds),
 	}
 }
 
-func makeEndpoint(clusterName string) *endpoint.ClusterLoadAssignment {
-	return &endpoint.ClusterLoadAssignment{
-		ClusterName: clusterName,
-		Endpoints: []*endpoint.LocalityLbEndpoints{{
-			LbEndpoints: []*endpoint.LbEndpoint{{
-				HostIdentifier: &endpoint.LbEndpoint_Endpoint{
-					Endpoint: &endpoint.Endpoint{
-						Address: &core.Address{
-							Address: &core.Address_SocketAddress{
-								SocketAddress: &core.SocketAddress{
-									Protocol: core.SocketAddress_TCP,
-									Address:  UpstreamHost,
-									PortSpecifier: &core.SocketAddress_PortValue{
-										PortValue: UpstreamPort,
-									},
+func makeEndpoint(cds spec.CDSInfo) *endpoint.ClusterLoadAssignment {
+	endpoints := []*endpoint.LbEndpoint{}
+	for _, ep := range cds.Endpoints {
+		ee := &endpoint.LbEndpoint{
+			HostIdentifier: &endpoint.LbEndpoint_Endpoint{
+				Endpoint: &endpoint.Endpoint{
+					Address: &core.Address{
+						Address: &core.Address_SocketAddress{
+							SocketAddress: &core.SocketAddress{
+								Protocol: core.SocketAddress_TCP,
+								Address:  ep.IP,
+								PortSpecifier: &core.SocketAddress_PortValue{
+									PortValue: ep.Port,
 								},
 							},
 						},
 					},
 				},
-			}},
+			},
+		}
+		endpoints = append(endpoints, ee)
+	}
+	return &endpoint.ClusterLoadAssignment{
+		ClusterName: cds.Name,
+		Endpoints: []*endpoint.LocalityLbEndpoints{{
+			LbEndpoints: endpoints,
 		}},
 	}
 }
 
-func makeRoute(routeName string, clusterName string) *route.RouteConfiguration {
-	return &route.RouteConfiguration{
-		Name: routeName,
-		VirtualHosts: []*route.VirtualHost{{
-			Name:    "local_service",
-			Domains: []string{"*"},
-			Routes: []*route.Route{{
+func makeRoute(rds spec.RDSInfo) (*route.RouteConfiguration, error) {
+	virtualHosts := []*route.VirtualHost{}
+	for _, info := range rds.VirtualHosts {
+		routers := []*route.Route{}
+		for _, routeJSON := range info.Routers {
+			router := &route.Route{}
+			if err := json.Unmarshal(routeJSON, router); err != nil {
+				return nil, err
+			}
+			routers = append(routers, router)
+		}
+		if len(info.Routers) == 0 {
+			route := &route.Route{
 				Match: &route.RouteMatch{
 					PathSpecifier: &route.RouteMatch_Prefix{
 						Prefix: "/",
@@ -82,14 +87,23 @@ func makeRoute(routeName string, clusterName string) *route.RouteConfiguration {
 				},
 				Action: &route.Route_Route{
 					Route: &route.RouteAction{
-						ClusterSpecifier: &route.RouteAction_Cluster{
-							Cluster: clusterName,
-						},
+						ClusterSpecifier: &route.RouteAction_Cluster{Cluster: info.Cluster},
 					},
 				},
-			}},
-		}},
+			}
+			routers = append(routers, route)
+		}
+		hh := &route.VirtualHost{
+			Name:    info.Name,
+			Domains: info.Domains,
+			Routes:  routers,
+		}
+		virtualHosts = append(virtualHosts, hh)
 	}
+	return &route.RouteConfiguration{
+		Name:         rds.Name,
+		VirtualHosts: virtualHosts,
+	}, nil
 }
 
 func makeRouteV2(routeName string, clusterName string) *route.RouteConfiguration {
@@ -116,7 +130,7 @@ func makeRouteV2(routeName string, clusterName string) *route.RouteConfiguration
 	}
 }
 
-func makeHTTPListener(listenerName string, route string) *listener.Listener {
+func makeHTTPListener(lds spec.LDSInfo) (*listener.Listener, error) {
 	routerConfig, _ := anypb.New(&router.Router{})
 	// HTTP filter configuration
 	manager := &hcm.HttpConnectionManager{
@@ -125,7 +139,7 @@ func makeHTTPListener(listenerName string, route string) *listener.Listener {
 		RouteSpecifier: &hcm.HttpConnectionManager_Rds{
 			Rds: &hcm.Rds{
 				ConfigSource:    makeConfigSource(),
-				RouteConfigName: route,
+				RouteConfigName: lds.Name,
 			},
 		},
 		HttpFilters: []*hcm.HttpFilter{{
@@ -135,18 +149,18 @@ func makeHTTPListener(listenerName string, route string) *listener.Listener {
 	}
 	pbst, err := anypb.New(manager)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	return &listener.Listener{
-		Name: listenerName,
+		Name: lds.Name,
 		Address: &core.Address{
 			Address: &core.Address_SocketAddress{
 				SocketAddress: &core.SocketAddress{
 					Protocol: core.SocketAddress_TCP,
-					Address:  listenerAddr,
+					Address:  lds.IP,
 					PortSpecifier: &core.SocketAddress_PortValue{
-						PortValue: listenerPort,
+						PortValue: lds.Port,
 					},
 				},
 			},
@@ -159,7 +173,7 @@ func makeHTTPListener(listenerName string, route string) *listener.Listener {
 				},
 			}},
 		}},
-	}
+	}, nil
 }
 
 func makeConfigSource() *core.ConfigSource {
@@ -182,14 +196,52 @@ func makeConfigSource() *core.ConfigSource {
 
 var version int
 
-func GenerateSnapshot() *cache.Snapshot {
+func GenerateSnapshot(req *spec.RouterRequst) error {
 	version++
-	snap, _ := cache.NewSnapshot(strconv.Itoa(version),
+	lds := []types.Resource{}
+	for _, info := range req.LDS {
+		ld, err := makeHTTPListener(info)
+		if err != nil {
+			return err
+		}
+		lds = append(lds, ld)
+	}
+	rds := []types.Resource{}
+	for _, info := range req.RDS {
+		rd, err := makeRoute(info)
+		if err != nil {
+			return err
+		}
+		rds = append(rds, rd)
+	}
+	cds := []types.Resource{}
+
+	for _, info := range req.CDS {
+		cd := makeCluster(info)
+		cds = append(cds, cd)
+	}
+
+	snap, err := cache.NewSnapshot(strconv.Itoa(version),
 		map[resource.Type][]types.Resource{
-			resource.ListenerType: {makeHTTPListener("Listener0", RouteName)},
-			resource.RouteType:    {makeRoute(RouteName, ClusterName)},
-			resource.ClusterType:  {makeCluster(ClusterName)},
+			resource.ListenerType: lds,
+			resource.RouteType:    rds,
+			resource.ClusterType:  cds,
 		},
 	)
-	return snap
+	if err != nil {
+		return err
+	}
+
+	log.Printf("will serve snapshot %+v\n", snap)
+
+	// Create the snapshot that we'll serve to Envoy
+	if err := snap.Consistent(); err != nil {
+		return err
+	}
+
+	// Add the snapshot to the cache
+	if err := snapCache.SetSnapshot(context.Background(), "nodeID", snap); err != nil {
+		return err
+	}
+	return nil
 }

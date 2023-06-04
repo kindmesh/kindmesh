@@ -19,14 +19,14 @@ type processor struct {
 	ns2GwIP        map[string]string
 	label2Pod      map[string]map[string]bool
 	clusterDomain  string
-	pod2ns         map[string]string
+	runningPod2ns  map[string]string
 	currHostPod2ns map[string]string
 
 	gwMalloctor malloctor
 	emitor      emitor
 
 	dnsRequest   *spec.DNSRequest
-	routerRequst *spec.RouterRequst
+	routerRequst *spec.RouterRequest
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -48,7 +48,7 @@ func newProcessor(hostIP, clusterDomain string, gwMalloctor malloctor, emitor em
 	return &processor{
 		eventChan:      make(chan *metaEvent, 10000),
 		hostIP:         hostIP,
-		pod2ns:         map[string]string{},
+		runningPod2ns:  map[string]string{},
 		currHostPod2ns: map[string]string{},
 		clusterDomain:  clusterDomain,
 		services:       make(map[string]*spec.L7Service),
@@ -101,6 +101,9 @@ func (p *processor) processEvent() {
 				if e.eventType == watch.Deleted {
 					if ok {
 						delete(vv, pod.Status.PodIP)
+						if len(vv) == 0 {
+							delete(p.label2Pod, label)
+						}
 					}
 				} else {
 					if !ok {
@@ -111,12 +114,14 @@ func (p *processor) processEvent() {
 			}
 			switch e.eventType {
 			case watch.Added, watch.Modified:
-				p.pod2ns[pod.Status.PodIP] = pod.Namespace
+				if pod.Status.Phase == v1.PodRunning {
+					p.runningPod2ns[pod.Status.PodIP] = pod.Namespace
+				}
 				if pod.Status.HostIP == p.hostIP {
 					p.currHostPod2ns[pod.Status.PodIP] = pod.Namespace
 				}
 			case watch.Deleted:
-				delete(p.pod2ns, pod.Status.PodIP)
+				delete(p.runningPod2ns, pod.Status.PodIP)
 				if pod.Status.HostIP == p.hostIP {
 					delete(p.currHostPod2ns, pod.Status.PodIP)
 				}
@@ -140,7 +145,6 @@ func (p *processor) processMetaEvent() {
 	}
 }
 func (p *processor) buildMeta() {
-
 	if err := p.ensureNS2GwIP(p.currHostPod2ns); err != nil {
 		log.Printf("ensureNS2GwIP error %v\n", err)
 		return
@@ -173,82 +177,13 @@ func (p *processor) buildDNS() error {
 }
 
 func (p *processor) buildEnvoy() error {
-	req := &spec.RouterRequst{}
-	lds := []spec.LDSInfo{}
-	for ns, gwIP := range p.ns2GwIP {
-		lds = append(lds, spec.LDSInfo{Name: ns, IP: gwIP, Port: 80})
+	p.routerRequst = &spec.RouterRequest{
+		Pod2NS:        p.runningPod2ns,
+		NS2GwIP:       p.ns2GwIP,
+		ServiceList:   p.services,
+		ClusterDomain: p.clusterDomain,
+		Label2Pod:     p.label2Pod,
 	}
-	req.LDS = lds
-
-	rds := []spec.RDSInfo{}
-	for ns := range p.ns2GwIP {
-		vhosts := []spec.VirtualHostInfo{}
-		for _, svc := range p.services {
-			name := svc.MetaData.Name + "." + svc.MetaData.Namespace
-			// current service + all service.ns + all service.ns.cluster.domain
-			domains := []string{name, name + "." + p.clusterDomain}
-			if ns == svc.MetaData.Namespace {
-				domains = append(domains, svc.MetaData.Name)
-			}
-			vhosts = append(vhosts, spec.VirtualHostInfo{
-				Name:    name,
-				Domains: domains,
-				Routers: nil, // TODO: from json
-				Cluster: svc.MetaData.Namespace + "_" + svc.MetaData.Name,
-			})
-		}
-		rds = append(rds, spec.RDSInfo{Name: ns, VirtualHosts: vhosts})
-	}
-	req.RDS = rds
-
-	cds := []spec.CDSInfo{}
-	for _, svc := range p.services {
-		name := svc.MetaData.Namespace + "_" + svc.MetaData.Name
-		// TODO: check has subset
-		// selector
-		ipSet := map[string]bool{}
-		isFrist := true
-		for k, v := range svc.Spec.Selector {
-			isFrist = true
-			ipList, ok := p.label2Pod[fmt.Sprintf("%s:%s", k, v)]
-			if !ok {
-				ipSet = map[string]bool{}
-				break
-			}
-			// first label
-			if isFrist {
-				for ip := range ipList {
-					// double check ip exists
-					if _, ok := p.pod2ns[ip]; !ok {
-						continue
-					}
-					ipSet[ip] = true
-				}
-				continue
-			}
-			// not first label: try intersection
-			for ip := range ipList {
-				if !ipSet[ip] {
-					delete(ipSet, ip)
-				}
-			}
-		}
-		endpoints := []spec.EndpointInfo{}
-		for ip := range ipSet {
-			if ip == "" {
-				fmt.Println("ip is empty?", ipSet)
-				continue
-			}
-			endpoints = append(endpoints, spec.EndpointInfo{IP: ip, Port: svc.Spec.TargetPort})
-		}
-		cds = append(cds, spec.CDSInfo{
-			Name:      name,
-			Endpoints: endpoints,
-		})
-	}
-	req.CDS = cds
-
-	p.routerRequst = req
 	return nil
 }
 

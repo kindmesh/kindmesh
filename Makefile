@@ -1,3 +1,5 @@
+VERSION ?= "beta"
+
 run:
 	go run cmd/mesh-agent/main.go
 	
@@ -13,3 +15,12 @@ load:
 	kind load docker-image kindmesh/mesh-agent
 	kind load docker-image kindmesh/local-dns
 	kind load docker-image kindmesh/envoy
+
+publish:
+	docker tag kindmesh/mesh-agent ccr.ccs.tencentyun.com/kindmesh/mesh-agent:$(VERSION)
+	docker tag kindmesh/local-dns ccr.ccs.tencentyun.com/kindmesh/local-dns:$(VERSION)
+	docker tag kindmesh/envoy ccr.ccs.tencentyun.com/kindmesh/envoy:$(VERSION)
+
+	docker push ccr.ccs.tencentyun.com/kindmesh/mesh-agent:$(VERSION)
+	docker push ccr.ccs.tencentyun.com/kindmesh/local-dns:$(VERSION)
+	docker push ccr.ccs.tencentyun.com/kindmesh/envoy:$(VERSION)

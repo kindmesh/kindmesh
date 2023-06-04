@@ -3,6 +3,7 @@ package envoy
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"strconv"
 	"time"
@@ -28,18 +29,62 @@ const (
 	xdsClusterName = "kind_xds_cluster"
 )
 
-func makeCluster(cds spec.CDSInfo) *cluster.Cluster {
+func makeCluster(svc *spec.L7Service, req *spec.RouterRequest) *cluster.Cluster {
+	name := svc.MetaData.Namespace + "_" + svc.MetaData.Name
+	// TODO: check has subset
+	// selector
+	ipSet := map[string]bool{}
+	isFrist := true
+	for k, v := range svc.Spec.Selector {
+		isFrist = true
+		ipList, ok := req.Label2Pod[fmt.Sprintf("%s:%s", k, v)]
+		if !ok {
+			ipSet = map[string]bool{}
+			break
+		}
+		// first label
+		if isFrist {
+			for ip := range ipList {
+				// double check ip exists
+				if _, ok := req.Pod2NS[ip]; !ok {
+					continue
+				}
+				ipSet[ip] = true
+			}
+			continue
+		}
+		// not first label: try intersection
+		for ip := range ipList {
+			if !ipSet[ip] {
+				delete(ipSet, ip)
+			}
+		}
+	}
+	endpoints := []*endpointInfo{}
+	for ip := range ipSet {
+		if ip == "" {
+			fmt.Println("ip is empty?", svc.MetaData.Name, ipSet)
+			continue
+		}
+		endpoints = append(endpoints, &endpointInfo{ip: ip, port: svc.Spec.TargetPort})
+	}
+	cls := makeEndpoint(name, endpoints)
 	return &cluster.Cluster{
-		Name:           cds.Name,
+		Name:           name,
 		ConnectTimeout: durationpb.New(5 * time.Second),
 		LbPolicy:       cluster.Cluster_ROUND_ROBIN, // TODO configable
-		LoadAssignment: makeEndpoint(cds),
+		LoadAssignment: cls,
 	}
 }
 
-func makeEndpoint(cds spec.CDSInfo) *endpoint.ClusterLoadAssignment {
+type endpointInfo struct {
+	ip   string
+	port uint32
+}
+
+func makeEndpoint(name string, eps []*endpointInfo) *endpoint.ClusterLoadAssignment {
 	endpoints := []*endpoint.LbEndpoint{}
-	for _, ep := range cds.Endpoints {
+	for _, ep := range eps {
 		ee := &endpoint.LbEndpoint{
 			HostIdentifier: &endpoint.LbEndpoint_Endpoint{
 				Endpoint: &endpoint.Endpoint{
@@ -47,9 +92,9 @@ func makeEndpoint(cds spec.CDSInfo) *endpoint.ClusterLoadAssignment {
 						Address: &core.Address_SocketAddress{
 							SocketAddress: &core.SocketAddress{
 								Protocol: core.SocketAddress_TCP,
-								Address:  ep.IP,
+								Address:  ep.ip,
 								PortSpecifier: &core.SocketAddress_PortValue{
-									PortValue: ep.Port,
+									PortValue: ep.port,
 								},
 							},
 						},
@@ -60,25 +105,25 @@ func makeEndpoint(cds spec.CDSInfo) *endpoint.ClusterLoadAssignment {
 		endpoints = append(endpoints, ee)
 	}
 	return &endpoint.ClusterLoadAssignment{
-		ClusterName: cds.Name,
+		ClusterName: name,
 		Endpoints: []*endpoint.LocalityLbEndpoints{{
 			LbEndpoints: endpoints,
 		}},
 	}
 }
 
-func makeRoute(rds spec.RDSInfo) (*route.RouteConfiguration, error) {
+func makeRoute(ns string, req *spec.RouterRequest) (*route.RouteConfiguration, error) {
 	virtualHosts := []*route.VirtualHost{}
-	for _, info := range rds.VirtualHosts {
-		routers := []*route.Route{}
-		for _, routeJSON := range info.Routers {
-			router := &route.Route{}
-			if err := json.Unmarshal(routeJSON, router); err != nil {
-				return nil, err
-			}
-			routers = append(routers, router)
+	for _, svc := range req.ServiceList {
+		domain := svc.MetaData.Name + "." + svc.MetaData.Namespace
+		name := svc.MetaData.Namespace + "_" + svc.MetaData.Name
+		// current service + all service.ns + all service.ns.cluster.domain
+		domains := []string{domain, domain + "." + req.ClusterDomain}
+		if ns == svc.MetaData.Namespace {
+			domains = append(domains, svc.MetaData.Name)
 		}
-		if len(info.Routers) == 0 {
+		routers := []*route.Route{}
+		if len(routers) == 0 {
 			route := &route.Route{
 				Match: &route.RouteMatch{
 					PathSpecifier: &route.RouteMatch_Prefix{
@@ -87,21 +132,21 @@ func makeRoute(rds spec.RDSInfo) (*route.RouteConfiguration, error) {
 				},
 				Action: &route.Route_Route{
 					Route: &route.RouteAction{
-						ClusterSpecifier: &route.RouteAction_Cluster{Cluster: info.Cluster},
+						ClusterSpecifier: &route.RouteAction_Cluster{Cluster: name},
 					},
 				},
 			}
 			routers = append(routers, route)
 		}
 		hh := &route.VirtualHost{
-			Name:    info.Name,
-			Domains: info.Domains,
+			Name:    name,
+			Domains: domains,
 			Routes:  routers,
 		}
 		virtualHosts = append(virtualHosts, hh)
 	}
 	return &route.RouteConfiguration{
-		Name:         rds.Name,
+		Name:         ns,
 		VirtualHosts: virtualHosts,
 	}, nil
 }
@@ -130,7 +175,7 @@ func makeRouteV2(routeName string, clusterName string) *route.RouteConfiguration
 	}
 }
 
-func makeHTTPListener(lds spec.LDSInfo) (*listener.Listener, error) {
+func makeHTTPListener(namespace, gwIP string) (*listener.Listener, error) {
 	routerConfig, _ := anypb.New(&router.Router{})
 	// HTTP filter configuration
 	manager := &hcm.HttpConnectionManager{
@@ -139,7 +184,7 @@ func makeHTTPListener(lds spec.LDSInfo) (*listener.Listener, error) {
 		RouteSpecifier: &hcm.HttpConnectionManager_Rds{
 			Rds: &hcm.Rds{
 				ConfigSource:    makeConfigSource(),
-				RouteConfigName: lds.Name,
+				RouteConfigName: namespace,
 			},
 		},
 		HttpFilters: []*hcm.HttpFilter{{
@@ -153,14 +198,14 @@ func makeHTTPListener(lds spec.LDSInfo) (*listener.Listener, error) {
 	}
 
 	return &listener.Listener{
-		Name: lds.Name,
+		Name: namespace,
 		Address: &core.Address{
 			Address: &core.Address_SocketAddress{
 				SocketAddress: &core.SocketAddress{
 					Protocol: core.SocketAddress_TCP,
-					Address:  lds.IP,
+					Address:  gwIP,
 					PortSpecifier: &core.SocketAddress_PortValue{
-						PortValue: lds.Port,
+						PortValue: 80,
 					},
 				},
 			},
@@ -196,29 +241,32 @@ func makeConfigSource() *core.ConfigSource {
 
 var version int
 
-func GenerateSnapshot(req *spec.RouterRequst) error {
+func GenerateSnapshot(req *spec.RouterRequest) error {
+	bs, _ := json.Marshal(req)
+	log.Printf("will serve snapshot %+v\n", string(bs))
 	version++
 	lds := []types.Resource{}
-	for _, info := range req.LDS {
-		ld, err := makeHTTPListener(info)
+	for ns, gwIP := range req.NS2GwIP {
+		ld, err := makeHTTPListener(ns, gwIP)
 		if err != nil {
 			return err
 		}
 		lds = append(lds, ld)
 	}
+
 	rds := []types.Resource{}
-	for _, info := range req.RDS {
-		rd, err := makeRoute(info)
+	for ns := range req.NS2GwIP {
+		rd, err := makeRoute(ns, req)
 		if err != nil {
-			return err
+			return err // TODO: skip
 		}
 		rds = append(rds, rd)
+		// rds = append(rds, spec.RDSInfo{Name: ns, VirtualHosts: vhosts})
 	}
-	cds := []types.Resource{}
 
-	for _, info := range req.CDS {
-		cd := makeCluster(info)
-		cds = append(cds, cd)
+	cds := []types.Resource{}
+	for _, svc := range req.ServiceList {
+		cds = append(cds, makeCluster(svc, req))
 	}
 
 	snap, err := cache.NewSnapshot(strconv.Itoa(version),
@@ -231,8 +279,6 @@ func GenerateSnapshot(req *spec.RouterRequst) error {
 	if err != nil {
 		return err
 	}
-
-	log.Printf("will serve snapshot %+v\n", snap)
 
 	// Create the snapshot that we'll serve to Envoy
 	if err := snap.Consistent(); err != nil {

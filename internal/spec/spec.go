@@ -52,8 +52,10 @@ type EndpointInfo struct {
 	Port uint32
 }
 
-type RouterRequst struct {
-	LDS []LDSInfo
-	RDS []RDSInfo
-	CDS []CDSInfo
+type RouterRequest struct {
+	Pod2NS        map[string]string
+	NS2GwIP       map[string]string
+	ServiceList   map[string]*L7Service
+	ClusterDomain string
+	Label2Pod     map[string]map[string]bool
 }

@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: details
-        image: docker.io/istio/examples-bookinfo-details-v1:1.18.0
+        image: docker.io/istio/examples-bookinfo-details-v1:1.17.0
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9080
@@ -43,13 +43,10 @@ spec:
     spec:
       containers:
       - name: ratings
-        image: docker.io/istio/examples-bookinfo-ratings-v1:1.18.0
+        image: docker.io/istio/examples-bookinfo-ratings-v1:1.17.0
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9080
-        env:
-        - name: RATINGS_SERVICE_PORT
-          value: "80"
 ---
 
 apiVersion: apps/v1
@@ -73,10 +70,73 @@ spec:
     spec:
       containers:
       - name: reviews
-        image: docker.io/istio/examples-bookinfo-reviews-v1:1.18.0
+        image: docker.io/istio/examples-bookinfo-reviews-v1:1.17.0
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9080
+        env:
+        - name: RATINGS_SERVICE_PORT
+          value: "80"
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reviews-v2
+  labels:
+    app: reviews
+    version: v2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reviews
+      version: v2
+  template:
+    metadata:
+      labels:
+        app: reviews
+        version: v2
+    spec:
+      containers:
+      - name: reviews
+        image: docker.io/istio/examples-bookinfo-reviews-v2:1.17.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9080
+        env:
+        - name: RATINGS_SERVICE_PORT
+          value: "80"
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reviews-v3
+  labels:
+    app: reviews
+    version: v3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reviews
+      version: v3
+  template:
+    metadata:
+      labels:
+        app: reviews
+        version: v3
+    spec:
+      containers:
+      - name: reviews
+        image: docker.io/istio/examples-bookinfo-reviews-v3:1.17.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9080
+        env:
+        - name: RATINGS_SERVICE_PORT
+          value: "80"
 ---
 
 apiVersion: apps/v1
@@ -100,7 +160,7 @@ spec:
     spec:
       containers:
       - name: productpage
-        image: docker.io/istio/examples-bookinfo-productpage-v1:1.18.0
+        image: docker.io/istio/examples-bookinfo-productpage-v1:1.17.0
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9080

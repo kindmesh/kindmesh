@@ -12,7 +12,7 @@ import (
 )
 
 var GlobalCache *MetaCache
-var Emitor emitor = func(dns *spec.DNSRequest, router *spec.RouterRequst) {
+var Emitor emitor = func(dns *spec.DNSRequest, router *spec.RouterRequest) {
 	log.Println("emit", *dns, *router)
 }
 
@@ -20,7 +20,7 @@ type malloctor interface {
 	AllocateForNames(names map[string]bool) (map[string]string, error)
 }
 
-type emitor func(dns *spec.DNSRequest, router *spec.RouterRequst)
+type emitor func(dns *spec.DNSRequest, router *spec.RouterRequest)
 
 func Init() {
 	hostIP := os.Getenv("HOST_IP")

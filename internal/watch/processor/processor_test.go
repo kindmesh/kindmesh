@@ -14,7 +14,7 @@ import (
 
 type mocker struct {
 	dns    *spec.DNSRequest
-	router *spec.RouterRequst
+	router *spec.RouterRequest
 }
 
 func (m *mocker) AllocateForNames(names map[string]bool) (map[string]string, error) {
@@ -24,7 +24,7 @@ func (m *mocker) AllocateForNames(names map[string]bool) (map[string]string, err
 	}
 	return ret, nil
 }
-func (m *mocker) Emit(dns *spec.DNSRequest, router *spec.RouterRequst) {
+func (m *mocker) Emit(dns *spec.DNSRequest, router *spec.RouterRequest) {
 	m.dns = dns
 	m.router = router
 	// fmt.Printf("dns %v %+v\n", *dns, *router)

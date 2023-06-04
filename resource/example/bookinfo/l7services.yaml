@@ -1,0 +1,42 @@
+apiVersion: kindmesh.io/v1
+kind: L7Service
+metadata:
+  name: details
+spec:
+  selector:
+    app: details
+  protocol: http
+  targetPort: 9080
+
+---
+apiVersion: kindmesh.io/v1
+kind: L7Service
+metadata:
+  name: reviews
+spec:
+  selector:
+    app: reviews
+  protocol: http
+  targetPort: 9080
+
+---
+apiVersion: kindmesh.io/v1
+kind: L7Service
+metadata:
+  name: ratings
+spec:
+  selector:
+    app: ratings
+  protocol: http
+  targetPort: 9080
+
+---
+apiVersion: kindmesh.io/v1
+kind: L7Service
+metadata:
+  name: productpage
+spec:
+  selector:
+    app: productpage
+  protocol: http
+  targetPort: 9080

@@ -58,24 +58,20 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: envoy
-        image: kindmesh/envoy
-        imagePullPolicy: Never
+        image: ccr.ccs.tencentyun.com/kindmesh/envoy:beta
+        imagePullPolicy: Always
       - name: local-dns
-        image: kindmesh/local-dns
-        imagePullPolicy: Never
+        image: ccr.ccs.tencentyun.com/kindmesh/local-dns:beta
+        imagePullPolicy: Always
       - name: mesh-agent
-        image: kindmesh/mesh-agent
-        imagePullPolicy: Never
+        image: ccr.ccs.tencentyun.com/kindmesh/mesh-agent:beta
+        imagePullPolicy: Always
         securityContext:
           capabilities:
             add:
             - NET_ADMIN
         env:
         - name: HOST_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
-        - name: HOST_IP2
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP

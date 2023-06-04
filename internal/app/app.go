@@ -21,7 +21,7 @@ func Run() {
 	netdevice.AddAddr(spec.DNS_BIND_IP)
 	netdevice.AddAddr(spec.ENVOY_CONTROL_IP)
 
-	processor.Emitor = func(dns *spec.DNSRequest, router *spec.RouterRequst) {
+	processor.Emitor = func(dns *spec.DNSRequest, router *spec.RouterRequest) {
 		buf, _ := json.Marshal(dns)
 		body := bytes.NewBuffer(buf)
 		resp, err := http.Post("http://"+spec.DNS_BIND_IP, "application/json", body)
